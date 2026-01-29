@@ -157,13 +157,8 @@ public class AuthService {
     }
 
     @Transactional
-    public void logout(String email) {
-        User user = (User) userRepository.findByEmail(email);
-        if (user == null) {
-            throw new UsernameNotFoundException("User not found");
-        }
-
-        refreshTokenService.revokeAllUserTokens(user);
+    public void logout(RefreshTokenRequestDTO request) {
+        refreshTokenService.revokeToken(request.refreshToken());
     }
 
 }

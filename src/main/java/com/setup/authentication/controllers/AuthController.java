@@ -127,4 +127,22 @@ public class AuthController {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
     }
+
+    @PostMapping("/logout")
+    public ResponseEntity<String> logout(@RequestBody @Valid RefreshTokenRequestDTO request) {
+        // Invalidate the refresh token cookie
+        ResponseCookie deleteCookie = ResponseCookie.from("refreshToken", "")
+                .httpOnly(true)
+                .secure(cookieSecure)
+                .sameSite("Strict")
+                .path("/api/auth/refresh-token")
+                .maxAge(0) // Expire immediately
+                .build();
+
+        authenticationService.logout(request);
+
+        return ResponseEntity.ok()
+                .header(HttpHeaders.SET_COOKIE, deleteCookie.toString())
+                .body("Logged out successfully");
+    }
 }

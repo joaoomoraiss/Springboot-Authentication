@@ -1,10 +1,10 @@
 package com.setup.authentication.services;
 
 import com.setup.authentication.domain.dto.*;
+import com.setup.authentication.domain.entities.RefreshToken;
 import com.setup.authentication.domain.entities.User;
-import com.setup.authentication.exceptions.EmailExistException;
-import com.setup.authentication.exceptions.ErrorInSendEmailConfirmation;
-import com.setup.authentication.exceptions.LoginFailedException;
+import com.setup.authentication.exceptions.*;
+import com.setup.authentication.repositories.RefreshTokenRepository;
 import com.setup.authentication.repositories.UserRepository;
 import com.setup.authentication.security.TokenService;
 import jakarta.mail.MessagingException;
@@ -23,14 +23,16 @@ public class AuthService {
     private final TokenService tokenService;
     private final MailService mailService;
     private final RefreshTokenService refreshTokenService;
+    private final RefreshTokenRepository refreshTokenRepository;
 
-    public AuthService(UserRepository userRepository, UserService userService, AuthenticationManager authenticationManager, TokenService tokenService, MailService mailService, RefreshTokenService refreshTokenService) {
+    public AuthService(UserRepository userRepository, UserService userService, AuthenticationManager authenticationManager, TokenService tokenService, MailService mailService, RefreshTokenService refreshTokenService, RefreshTokenRepository refreshTokenRepository) {
         this.userRepository = userRepository;
         this.userService = userService;
         this.authenticationManager = authenticationManager;
         this.tokenService = tokenService;
         this.mailService = mailService;
         this.refreshTokenService = refreshTokenService;
+        this.refreshTokenRepository = refreshTokenRepository;
     }
 
     @Transactional
@@ -119,7 +121,7 @@ public class AuthService {
         try {
             mailService.sendEmailResetPassword(email, resetPasswordToken);
         } catch (MessagingException e) {
-            throw new ErrorInSendEmailConfirmation("Error sending reset password " + e);
+            throw new ErrorInSendPasswordReset("Error sending reset password " + e);
         }
     }
 
@@ -149,7 +151,7 @@ public class AuthService {
         // revoke old refresh token
         refreshTokenService.revokeToken(refreshToken);
 
-        // Ggenerate new tokens
+        // Generate new tokens
         String newAccessToken = tokenService.generateToken(user);
         String newRefreshToken = refreshTokenService.createRefreshToken(user);
 
@@ -158,6 +160,12 @@ public class AuthService {
 
     @Transactional
     public void logout(RefreshTokenRequestDTO request) {
+        RefreshToken token = refreshTokenRepository.findByToken(request.refreshToken())
+                .orElseThrow(() -> new RefreshTokenNotFoundException("Refresh token not found"));
+
+        if (token.isRevoked()) {
+            throw new RevokedRefreshTokenException("Refresh token is revoked");
+        }
         refreshTokenService.revokeToken(request.refreshToken());
     }
 
